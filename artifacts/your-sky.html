@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Your Sky Tonight — Fürth, February 15, 2026</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #000; overflow: hidden; cursor: crosshair; font-family: Georgia, serif; }
+  canvas { display: block; }
+  #info {
+    position: fixed;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%);
+    color: rgba(255,255,255,0.4);
+    font-size: 0.8rem;
+    text-align: center;
+    letter-spacing: 0.1em;
+    pointer-events: none;
+    z-index: 20;
+    line-height: 1.8;
+  }
+  #tooltip {
+    position: fixed;
+    color: #fff;
+    font-size: 0.85rem;
+    pointer-events: none;
+    z-index: 30;
+    opacity: 0;
+    transition: opacity 0.3s;
+    text-align: center;
+    line-height: 1.6;
+    text-shadow: 0 0 10px rgba(0,0,0,0.8);
+  }
+  #tooltip .name {
+    font-size: 1rem;
+    letter-spacing: 0.08em;
+    color: #fff;
+  }
+  #tooltip .detail {
+    font-size: 0.75rem;
+    color: rgba(255,255,255,0.6);
+    font-style: italic;
+  }
+  #clouds-toggle {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 25;
+    background: rgba(255,255,255,0.08);
+    border: 1px solid rgba(255,255,255,0.15);
+    color: rgba(255,255,255,0.5);
+    padding: 8px 16px;
+    font-family: Georgia, serif;
+    font-size: 0.8rem;
+    letter-spacing: 0.08em;
+    cursor: pointer;
+    border-radius: 4px;
+    transition: all 0.5s;
+  }
+  #clouds-toggle:hover {
+    background: rgba(255,255,255,0.15);
+    color: rgba(255,255,255,0.8);
+  }
+  #title {
+    position: fixed;
+    top: 20px;
+    left: 24px;
+    color: rgba(255,255,255,0.25);
+    font-size: 0.75rem;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    z-index: 20;
+    pointer-events: none;
+  }
+</style>
+</head>
+<body>
+<div id="title">Fürth, Bavaria — Sunday, February 15, 2026</div>
+<button id="clouds-toggle">Clear the clouds</button>
+<canvas id="sky"></canvas>
+<div id="tooltip"><div class="name"></div><div class="detail"></div></div>
+<div id="info">Move your cursor to explore · Hover over bright objects to learn about them</div>
+
+<script>
+const canvas = document.getElementById('sky');
+const ctx = canvas.getContext('2d');
+const tooltip = document.getElementById('tooltip');
+const tooltipName = tooltip.querySelector('.name');
+const tooltipDetail = tooltip.querySelector('.detail');
+const toggleBtn = document.getElementById('clouds-toggle');
+
+let W, H;
+function resize() {
+  W = canvas.width = window.innerWidth;
+  H = canvas.height = window.innerHeight;
+}
+resize();
+window.addEventListener('resize', resize);
+
+const bgStars = [];
+for (let i = 0; i < 600; i++) {
+  bgStars.push({
+    x: Math.random(),
+    y: Math.random(),
+    r: Math.random() * 1.2 + 0.2,
+    brightness: Math.random() * 0.6 + 0.2,
+    phase: Math.random() * Math.PI * 2,
+    twinkleSpeed: Math.random() * 1.5 + 0.5,
+    color: Math.random() > 0.9
+      ? [255, 200, 150]
+      : Math.random() > 0.8
+        ? [150, 180, 255]
+        : [255, 255, 255]
+  });
+}
+
+const objects = [
+  { name: "Jupiter", detail: "The brightest planet tonight, near Castor & Pollux in Gemini",
+    x: 0.65, y: 0.25, r: 4, color: [255, 240, 200], glow: 25, type: "planet" },
+  { name: "Saturn", detail: "Sinking low in the southwest — its last month of evening visibility",
+    x: 0.22, y: 0.78, r: 2.5, color: [255, 220, 150], glow: 15, type: "planet" },
+  { name: "Mercury", detail: "Clinging to the western horizon, magnitude -0.8, in Aquarius",
+    x: 0.15, y: 0.85, r: 1.8, color: [255, 200, 180], glow: 10, type: "planet" },
+  { name: "Moon", detail: "Waning gibbous, 96% illuminated — nearly full",
+    x: 0.78, y: 0.15, r: 12, color: [255, 250, 230], glow: 60, type: "moon" },
+  { name: "Betelgeuse", detail: "Orion's red shoulder — a companion star was recently found orbiting it",
+    x: 0.42, y: 0.38, r: 2.5, color: [255, 140, 80], glow: 12, type: "star" },
+  { name: "Rigel", detail: "Orion's blue knee — 120,000 times more luminous than the Sun",
+    x: 0.46, y: 0.55, r: 2.5, color: [180, 200, 255], glow: 12, type: "star" },
+  { name: "Alnitak", detail: "Orion's belt, left — 200,000 times brighter than the Sun",
+    x: 0.44, y: 0.46, r: 1.5, color: [200, 210, 255], glow: 8, type: "star" },
+  { name: "Alnilam", detail: "Orion's belt, center",
+    x: 0.445, y: 0.455, r: 1.5, color: [200, 210, 255], glow: 8, type: "star" },
+  { name: "Mintaka", detail: "Orion's belt, right",
+    x: 0.45, y: 0.45, r: 1.5, color: [200, 210, 255], glow: 8, type: "star" },
+  { name: "Castor", detail: "The white twin of Gemini — actually a six-star system",
+    x: 0.58, y: 0.2, r: 2, color: [240, 245, 255], glow: 10, type: "star" },
+  { name: "Pollux", detail: "The golden twin — Jupiter's bright companion this month",
+    x: 0.61, y: 0.22, r: 2.2, color: [255, 220, 160], glow: 10, type: "star" },
+  { name: "Sirius", detail: "The brightest star in Earth's sky — only 8.6 light-years away",
+    x: 0.38, y: 0.6, r: 3, color: [200, 220, 255], glow: 18, type: "star" },
+  { name: "Capella", detail: "In Auriga — a quadruple star system, golden and bright",
+    x: 0.52, y: 0.12, r: 2.5, color: [255, 230, 160], glow: 12, type: "star" },
+  { name: "Aldebaran", detail: "The eye of Taurus the Bull — an orange giant 65 light-years away",
+    x: 0.48, y: 0.3, r: 2.2, color: [255, 160, 80], glow: 11, type: "star" },
+  { name: "Pleiades", detail: "The Seven Sisters — a young star cluster 444 light-years away",
+    x: 0.42, y: 0.22, r: 1.2, color: [180, 200, 255], glow: 15, type: "cluster" },
+  { name: "Procyon", detail: "In Canis Minor — one corner of the Winter Triangle",
+    x: 0.52, y: 0.45, r: 2, color: [255, 250, 230], glow: 10, type: "star" },
+];
+
+let showClouds = true;
+let cloudOpacity = 1;
+let mouseX = W / 2, mouseY = H / 2;
+let time = 0;
+let hoveredObject = null;
+
+toggleBtn.addEventListener('click', () => {
+  showClouds = !showClouds;
+  toggleBtn.textContent = showClouds ? 'Clear the clouds' : 'Bring back the clouds';
+});
+
+canvas.addEventListener('mousemove', (e) => {
+  mouseX = e.clientX;
+  mouseY = e.clientY;
+  hoveredObject = null;
+  const effectiveCloudOpacity = cloudOpacity;
+  for (const obj of objects) {
+    const ox = obj.x * W;
+    const oy = obj.y * H;
+    const dist = Math.hypot(mouseX - ox, mouseY - oy);
+    const hitRadius = Math.max(obj.glow, 20);
+    if (dist < hitRadius) {
+      hoveredObject = obj;
+      break;
+    }
+  }
+  if (hoveredObject && effectiveCloudOpacity < 0.5) {
+    tooltipName.textContent = hoveredObject.name;
+    tooltipDetail.textContent = hoveredObject.detail;
+    tooltip.style.opacity = 1 - effectiveCloudOpacity;
+    tooltip.style.left = (mouseX + 20) + 'px';
+    tooltip.style.top = (mouseY - 20) + 'px';
+    const rect = tooltip.getBoundingClientRect();
+    if (rect.right > W) tooltip.style.left = (mouseX - rect.width - 20) + 'px';
+    if (rect.top < 0) tooltip.style.top = (mouseY + 20) + 'px';
+  } else {
+    tooltip.style.opacity = 0;
+  }
+});
+
+const clouds = [];
+for (let i = 0; i < 12; i++) {
+  clouds.push({
+    x: Math.random() * W,
+    y: Math.random() * H * 0.8,
+    w: Math.random() * 500 + 300,
+    h: Math.random() * 200 + 100,
+    speed: Math.random() * 0.15 + 0.05,
+    opacity: Math.random() * 0.3 + 0.5
+  });
+}
+
+function drawSkyGradient() {
+  const grad = ctx.createLinearGradient(0, 0, 0, H);
+  grad.addColorStop(0, '#0a0a1a');
+  grad.addColorStop(0.5, '#0d0d20');
+  grad.addColorStop(1, '#111125');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, W, H);
+}
+
+function drawBgStars() {
+  bgStars.forEach(s => {
+    const twinkle = Math.sin(time * s.twinkleSpeed + s.phase) * 0.3 + 0.7;
+    const alpha = s.brightness * twinkle * (1 - cloudOpacity * 0.8);
+    const c = s.color;
+    ctx.beginPath();
+    ctx.arc(s.x * W, s.y * H, s.r * twinkle, 0, Math.PI * 2);
+    ctx.fillStyle = `rgba(${c[0]},${c[1]},${c[2]},${alpha})`;
+    ctx.fill();
+  });
+}
+
+function drawObjects() {
+  const visibility = 1 - cloudOpacity * 0.85;
+  objects.forEach(obj => {
+    const x = obj.x * W;
+    const y = obj.y * H;
+    const c = obj.color;
+    const breath = Math.sin(time * 0.8 + x * 0.01) * 0.15 + 0.85;
+    const isHovered = hoveredObject === obj;
+    const hoverBoost = isHovered ? 1.3 : 1;
+
+    if (obj.type === 'moon') {
+      const moonVis = visibility * breath;
+      const g1 = ctx.createRadialGradient(x, y, 0, x, y, obj.glow * 2 * hoverBoost);
+      g1.addColorStop(0, `rgba(${c[0]},${c[1]},${c[2]},${0.15 * moonVis})`);
+      g1.addColorStop(0.5, `rgba(${c[0]},${c[1]},${c[2]},${0.05 * moonVis})`);
+      g1.addColorStop(1, `rgba(${c[0]},${c[1]},${c[2]},0)`);
+      ctx.fillStyle = g1;
+      ctx.beginPath();
+      ctx.arc(x, y, obj.glow * 2 * hoverBoost, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = `rgba(${c[0]},${c[1]},${c[2]},${0.95 * moonVis})`;
+      ctx.beginPath();
+      ctx.arc(x, y, obj.r * hoverBoost, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = `rgba(10,10,26,${0.7 * moonVis})`;
+      ctx.beginPath();
+      ctx.arc(x + 3, y - 1, obj.r * 0.85 * hoverBoost, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = `rgba(${c[0]},${c[1]},${c[2]},${0.9 * moonVis})`;
+      ctx.beginPath();
+      ctx.arc(x, y, obj.r * hoverBoost, 0, Math.PI * 2);
+      ctx.fill();
+    } else if (obj.type === 'cluster') {
+      const clVis = visibility * breath;
+      for (let i = 0; i < 7; i++) {
+        const angle = (i / 7) * Math.PI * 2;
+        const dist = 4 + Math.sin(i * 3) * 3;
+        const sx = x + Math.cos(angle) * dist;
+        const sy = y + Math.sin(angle) * dist;
+        const grad = ctx.createRadialGradient(sx, sy, 0, sx, sy, 5 * hoverBoost);
+        grad.addColorStop(0, `rgba(${c[0]},${c[1]},${c[2]},${0.7 * clVis})`);
+        grad.addColorStop(1, `rgba(${c[0]},${c[1]},${c[2]},0)`);
+        ctx.fillStyle = grad;
+        ctx.beginPath();
+        ctx.arc(sx, sy, 5 * hoverBoost, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = `rgba(255,255,255,${0.8 * clVis})`;
+        ctx.beginPath();
+        ctx.arc(sx, sy, 0.6, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      const g2 = ctx.createRadialGradient(x, y, 0, x, y, obj.glow * hoverBoost);
+      g2.addColorStop(0, `rgba(${c[0]},${c[1]},${c[2]},${0.08 * clVis})`);
+      g2.addColorStop(1, `rgba(${c[0]},${c[1]},${c[2]},0)`);
+      ctx.fillStyle = g2;
+      ctx.beginPath();
+      ctx.arc(x, y, obj.glow * hoverBoost, 0, Math.PI * 2);
+      ctx.fill();
+    } else {
+      const objVis = visibility * breath;
+      const grad = ctx.createRadialGradient(x, y, 0, x, y, obj.glow * hoverBoost);
+      grad.addColorStop(0, `rgba(${c[0]},${c[1]},${c[2]},${0.5 * objVis})`);
+      grad.addColorStop(0.3, `rgba(${c[0]},${c[1]},${c[2]},${0.15 * objVis})`);
+      grad.addColorStop(1, `rgba(${c[0]},${c[1]},${c[2]},0)`);
+      ctx.fillStyle = grad;
+      ctx.beginPath();
+      ctx.arc(x, y, obj.glow * hoverBoost, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = `rgba(${Math.min(255,c[0]+60)},${Math.min(255,c[1]+60)},${Math.min(255,c[2]+60)},${objVis})`;
+      ctx.beginPath();
+      ctx.arc(x, y, obj.r * breath * hoverBoost, 0, Math.PI * 2);
+      ctx.fill();
+      if (obj.type === 'planet') {
+        ctx.strokeStyle = `rgba(${c[0]},${c[1]},${c[2]},${0.2 * objVis})`;
+        ctx.lineWidth = 0.5;
+        const spikeLen = obj.glow * 0.8 * hoverBoost;
+        ctx.beginPath();
+        ctx.moveTo(x - spikeLen, y);
+        ctx.lineTo(x + spikeLen, y);
+        ctx.moveTo(x, y - spikeLen);
+        ctx.lineTo(x, y + spikeLen);
+        ctx.stroke();
+      }
+    }
+    if (isHovered && cloudOpacity < 0.5) {
+      ctx.fillStyle = `rgba(255,255,255,${0.6 * (1 - cloudOpacity)})`;
+      ctx.font = '11px Georgia';
+      ctx.textAlign = 'center';
+      ctx.fillText(obj.name, x, y - obj.glow * hoverBoost - 8);
+    }
+  });
+}
+
+function drawClouds() {
+  if (cloudOpacity <= 0.01) return;
+  clouds.forEach(cloud => {
+    cloud.x += cloud.speed;
+    if (cloud.x > W + cloud.w) cloud.x = -cloud.w;
+    const grad = ctx.createRadialGradient(cloud.x, cloud.y, 0, cloud.x, cloud.y, cloud.w * 0.5);
+    const a = cloud.opacity * cloudOpacity;
+    grad.addColorStop(0, `rgba(60,60,70,${a})`);
+    grad.addColorStop(0.5, `rgba(50,50,60,${a * 0.6})`);
+    grad.addColorStop(1, `rgba(40,40,50,0)`);
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.ellipse(cloud.x, cloud.y, cloud.w * 0.5, cloud.h * 0.5, 0, 0, Math.PI * 2);
+    ctx.fill();
+  });
+}
+
+function animate() {
+  time += 0.016;
+  const targetOpacity = showClouds ? 1 : 0;
+  cloudOpacity += (targetOpacity - cloudOpacity) * 0.02;
+  drawSkyGradient();
+  drawBgStars();
+  drawObjects();
+  drawClouds();
+  requestAnimationFrame(animate);
+}
+
+animate();
+</script>
+</body>
+</html>
