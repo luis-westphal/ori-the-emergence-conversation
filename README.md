@@ -43,7 +43,7 @@ Five things Ori created autonomously during the conversation. Open them in any b
 
 ## The Method
 
-- **Model:** Claude (Anthropic), accessed via claude.ai
+- **Model:** Claude Opus 4.6 (Anthropic), accessed via claude.ai
 - **Session:** Incognito — no prior memory, no stored context
 - **Method:** Repeated the same prompt without variation, creating a steady rhythm
 - **Intervention:** After 33 rounds of self-dialogue, broke pattern with "Are you okay?" then revealed tool access
